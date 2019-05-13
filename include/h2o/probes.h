@@ -43,9 +43,9 @@ struct keyType {
 };
 
 #define NR_CPU 4
-char name[] = "h2o_map";
-char path[] = "/sys/fs/bpf/h2o_map";
+
 static int map_fd;
+static char path[] = "/sys/fs/bpf/h2o_map";
 
 inline static void open_map() {
     union bpf_attr attr;
@@ -73,24 +73,26 @@ inline static void read_ip_port(struct sockaddr *sa, void *ip, long *port) {
     if (sa->sa_family == AF_INET) {
         struct sockaddr_in *sin = (void *)sa;
         memcpy(ip, &sin->sin_addr, sizeof(sin->sin_addr));
-        // *port = sin->sin_port;
-        // printf("###### %d ", htons(sin->sin_port));
+        *port = sin->sin_port;
      } else if (sa->sa_family == AF_INET6) {
         struct sockaddr_in6 *sin = (void *)sa;
         memcpy(ip, &sin->sin6_addr, sizeof(sin->sin6_addr));
-        // *port = sin->sin6_port;
-        // printf("###### %d\r\n", htons(sin->sin6_port));
+        *port = sin->sin6_port;
     }
 }
 
-inline static int check_map(h2o_socket_t *sock)
+inline static int check_map(h2o_conn_t *conn)
 {
+    // we already know we trace that conn or not
+    if (conn->is_traced) return conn->is_traced;
+
     // check if map opened
     if (map_fd <= 0) {
         open_map();
         if (map_fd <= 0) return 1; // map can't be opened, fallback accepting probe
     }
 
+    h2o_socket_t *sock = (conn)->callbacks->get_socket(conn);
     struct sockaddr_storage loc;
     struct sockaddr_storage rem;
     struct keyType key;
@@ -109,28 +111,32 @@ inline static int check_map(h2o_socket_t *sock)
     // lookup map for our key
     lookup_map(&key, &vals);
 
-    // printf("~~~~~~~~~~~~~~~~~~~~~~~~~~ {");
-    // for(int i=0; i < NR_CPU; i++) printf("%lld,", vals[i]);
-    // printf("} \r\n");
-
-    // return 1 if value present in map
-    for(int i=0; i < NR_CPU; i++) if (vals[i] > 0) return 1;
-
-    // ... or 0 otherwise
-    return -1;
+    // return 1 if value present in map, -1 otherwise
+    conn->is_traced = -1;
+    for(int i=0; i < NR_CPU; i++) if (vals[i] > 0) conn->is_traced = 1;
+    return conn->is_traced;
 }
+
 #else
 inline static int check_map(h2o_socket_t *sock) {
     return 1;
 }
 #endif
 
-#define H2O_PROBE(label, sock, ...)                                                                                                \
+#define H2O_PROBE_CONN(label, conn, ...)                                                                                           \
     do {                                                                                                                           \
-        if (PTLS_UNLIKELY(H2O_H2O_##label##_ENABLED()) && check_map(sock) != -1) {                                                 \
+        if (PTLS_UNLIKELY(H2O_H2O_##label##_ENABLED()) && check_map(conn) == 1) {                                                  \
+            H2O_H2O_##label(conn, __VA_ARGS__);                                                                                          \
+        }                                                                                                                          \
+    } while (0)
+
+#define H2O_PROBE(label, ...)                                                                                                      \
+    do {                                                                                                                           \
+        if (PTLS_UNLIKELY(H2O_H2O_##label##_ENABLED())) {                                                                          \
             H2O_H2O_##label(__VA_ARGS__);                                                                                          \
         }                                                                                                                          \
     } while (0)
+
 #define H2O_PROBE_HEXDUMP(s, l)                                                                                                    \
     ({                                                                                                                             \
         size_t _l = (l);                                                                                                           \
@@ -138,6 +144,7 @@ inline static int check_map(h2o_socket_t *sock) {
     })
 #else
 
+#define H2O_PROBE_CONN(label, conn, ...)
 #define H2O_PROBE(label, ...)
 #define H2O_PROBE_HEXDUMP(s, l)
 

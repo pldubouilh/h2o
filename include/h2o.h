@@ -836,6 +836,10 @@ struct st_h2o_conn_t {
      */
     uint64_t id;
     /**
+     * flag to track if connection is being traced. 0 is unknown, -1 is not traced, 1 is traced.
+     */
+    char is_traced;
+    /**
      * callbacks
      */
     const h2o_conn_callbacks_t *callbacks;
@@ -1992,6 +1996,7 @@ inline h2o_conn_t *h2o_create_connection(size_t sz, h2o_context_t *ctx, h2o_host
     conn->ctx = ctx;
     conn->hosts = hosts;
     conn->connected_at = connected_at;
+    conn->is_traced = 0;
 #ifdef H2O_NO_64BIT_ATOMICS
     pthread_mutex_lock(&h2o_conn_id_mutex);
     conn->id = ++h2o_connection_id;

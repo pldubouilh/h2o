@@ -33,8 +33,8 @@
 
 #define H2O_PROBE_CONN(label, _conn, ...)                                                                                          \
     do {                                                                                                                           \
-        if ((*_conn).is_traced) {                                                                                                  \
-           H2O_PROBE(label, _conn, ...);                                                                                           \
+        if(PTLS_UNLIKELY((*_conn).is_traced)) {                                                                                    \
+            H2O_PROBE(label, _conn, __VA_ARGS__);                                                                                  \
         }                                                                                                                          \
     } while (0)
 

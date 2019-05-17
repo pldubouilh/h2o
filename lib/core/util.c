@@ -945,9 +945,10 @@ void h2o_cleanup_thread(void)
     h2o_mem_clear_recycle(&h2o_socket_buffer_prototype.allocator);
 }
 
-#ifdef __linux__
+#if H2O_USE_DTRACE && defined(__linux__)
 #include <linux/bpf.h>
 #include <linux/unistd.h>
+#include "h2o-probes.h"
 
 struct keyType {
     u_int8_t ipa[16];
@@ -992,9 +993,15 @@ inline static void read_ip_port(struct sockaddr *sa, void *ip, long *port) {
 
 char h2o_trace_check_map(h2o_socket_t *sock, int *map_fd, int num_procs)
 {
-    // no sock provided, fallback accepting probe
-    if (sock == NULL)
-        return 1;
+    // check for tracing enablement
+    if (H2O_UNLIKELY(!H2O_H2O_CONN_TRACING_ENABLED())) {
+
+        // cleanup opened map if it was opened
+        if (H2O_UNLIKELY(*map_fd > 0))
+            *map_fd = close(*map_fd);
+
+        return 0;
+    }
 
     // try open map if not opened
     if (*map_fd <= 0 && open_map(map_fd) <= 0)
@@ -1026,10 +1033,10 @@ char h2o_trace_check_map(h2o_socket_t *sock, int *map_fd, int num_procs)
         if (vals[i] > 0)
             return 1;
 
-    // 0 otherwise
+    // 0 otherwise - should never be called
+    H2O_H2O_CONN_TRACING(); // dummy call to a trace only used for checking enablement
     return 0;
 }
-
 #else
 char h2o_trace_check_map(h2o_socket_t *sock, int *map_fd, int num_procs) {
     return 1;

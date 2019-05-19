@@ -25,7 +25,7 @@
 /* This file must only be included from the source files of the h2o / libh2o, because H2O_USE_DTRACE is a symbol available only
  * during the build phase of h2o.  That's fine, because only h2o / libh2o should have the right to define probes belonging to the
  * h2o namespace.
-*/
+ */
 #if H2O_USE_DTRACE
 
 #include "picotls.h"
@@ -33,7 +33,7 @@
 
 #define H2O_PROBE_CONN(label, _conn, ...)                                                                                          \
     do {                                                                                                                           \
-        if(PTLS_UNLIKELY((*_conn).is_traced)) {                                                                                    \
+        if (PTLS_UNLIKELY((*_conn).is_traced)) {                                                                                   \
             H2O_PROBE(label, _conn, __VA_ARGS__);                                                                                  \
         }                                                                                                                          \
     } while (0)

@@ -2009,7 +2009,7 @@ inline h2o_conn_t *h2o_create_connection(size_t sz, h2o_socket_t *sock, h2o_cont
     conn->ctx = ctx;
     conn->hosts = hosts;
     conn->connected_at = connected_at;
-    conn->is_traced = h2o_trace_check_map(sock, &ctx->map_fd, (int) (**hosts).global->num_procs);
+    conn->is_traced = h2o_trace_check_map(sock, &ctx->map_fd, (int)(**hosts).global->num_procs);
 
 #ifdef H2O_NO_64BIT_ATOMICS
     pthread_mutex_lock(&h2o_conn_id_mutex);
